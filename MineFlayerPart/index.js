@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer')
-const Item=require("prismarine-item")("1.8");
+const Item = require("prismarine-item")("1.8");
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow } = require('mineflayer-pathfinder').goals
 
@@ -8,52 +8,71 @@ const app = express();
 const port = 3000;
 
 const options = {
-    host: 'localhost',
-    port: 25565,
-    username: 'SpecFlow'
-  }
-  
+  host: 'localhost',
+  port: 25565,
+  username: 'SpecFlow'
+}
+
 
 const bot = mineflayer.createBot(options);
-bot.on('error', (err) =>
-{
+bot.on('error', (err) => {
   console.log(err);
 });
 
-app.use(express.urlencoded()); 
+app.use(express.urlencoded());
 app.use(express.json());
 
 app.listen(port, () => {
-    console.log(`Example of a server running at http://localhost:${port}`)
+  console.log(`Example of a server running at http://localhost:${port}`)
 });
 
 
 let mcData;
 let defaultMove;
 
-app.get ('/position', (req, res) => {
-    res.send(bot.entity.position);
+app.get('/position', (req, res) => {
+  res.send(bot.entity.position);
 })
 
 app.post('/position', (req, res) => {
-    bot.pathfinder.setMovements(defaultMove);
-    bot.pathfinder.setGoal(new GoalBlock(req.body.x, req.body.y, req.body.z));
-    res.send(bot.entity.position);
+  bot.pathfinder.setMovements(defaultMove);
+  bot.pathfinder.setGoal(new GoalBlock(req.body.x, req.body.y, req.body.z));
+  res.send(bot.entity.position);
 });
 
-app.get ('/inventory', (req, res) => {
+app.post('/look', (req, res) => {
+  bot.lookAt(req.body);
+});
+
+app.get('/inventory', (req, res) => {
   res.send(sayItems());
 });
 
-app.post ('/slot', (req, res) => {
-    var slotPosition = req.body.position;
-    var itemName = req.body.item;
+app.post('/slot', (req, res) => {
+  var slotPosition = req.body.position;
+  var itemName = req.body.item;
 
-    item = findItemByName(itemName);
+  item = findItemByName(itemName);
 
-    bot.creative.setInventorySlot(slotPosition, item);
+  bot.creative.setInventorySlot(slotPosition, item);
 
-    res.sendStatus(200);
+  res.sendStatus(200);
+});
+
+
+app.post('/placeBlock', (req, res) => {
+  var itemName = req.body.item;
+  var position = req.body.position;
+
+  item = findItemByName(itemName);
+
+  bot.creative.setInventorySlot(10, item)
+    .then(() => {
+      bot.equip(item, 'hand').then(() => {
+        var referenceBlock = bot.blockAt(position);
+        bot.placeBlock(referenceBlock, new Vec3(0,1,0));
+      });
+    })
 });
 
 bot.loadPlugin(pathfinder)
@@ -72,7 +91,7 @@ bot.once('spawn', () => {
 })
 
 
-function sayItems (items = bot.inventory.items()) {
+function sayItems(items = bot.inventory.items()) {
   const output = items.map(itemToString).join(', ')
   if (output) {
     bot.chat(output)
@@ -85,8 +104,7 @@ function findItemByName(itemName) {
   var items = mcData.itemsArray;
   var i;
   for (i = 0; i < items.length; i++) {
-    if (items[i].displayName === itemName)
-    {
+    if (items[i].displayName === itemName) {
       var foundItem = items[i];
 
       return new Item(foundItem.id, 1);
@@ -95,7 +113,7 @@ function findItemByName(itemName) {
   return null;
 }
 
-function tossItem (name, amount) {
+function tossItem(name, amount) {
   amount = parseInt(amount, 10)
   const item = itemByName(name)
   if (!item) {
@@ -106,7 +124,7 @@ function tossItem (name, amount) {
     bot.tossStack(item, checkIfTossed)
   }
 
-  function checkIfTossed (err) {
+  function checkIfTossed(err) {
     if (err) {
       bot.chat(`unable to toss: ${err.message}`)
     } else if (amount) {
@@ -117,7 +135,7 @@ function tossItem (name, amount) {
   }
 }
 
-async function equipItem (name, destination) {
+async function equipItem(name, destination) {
   const item = itemByName(name)
   if (item) {
     try {
@@ -131,7 +149,7 @@ async function equipItem (name, destination) {
   }
 }
 
-async function unequipItem (destination) {
+async function unequipItem(destination) {
   try {
     await bot.unequip(destination)
     bot.chat('unequipped')
@@ -140,12 +158,12 @@ async function unequipItem (destination) {
   }
 }
 
-function useEquippedItem () {
+function useEquippedItem() {
   bot.chat('activating item')
   bot.activateItem()
 }
 
-async function craftItem (name, amount) {
+async function craftItem(name, amount) {
   amount = parseInt(amount, 10)
   const mcData = require('minecraft-data')(bot.version)
 
@@ -174,7 +192,7 @@ async function craftItem (name, amount) {
   }
 }
 
-function itemToString (item) {
+function itemToString(item) {
   if (item) {
     return `${item.name} x ${item.count}`
   } else {
@@ -182,12 +200,11 @@ function itemToString (item) {
   }
 }
 
-function itemByName (name) {
+function itemByName(name) {
   return bot.inventory.items().filter(item => item.name === name)[0]
 }
 
-function printError(err)
-{
+function printError(err) {
   bot.chat(err);
 }
 

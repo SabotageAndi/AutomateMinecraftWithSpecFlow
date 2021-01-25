@@ -8,10 +8,17 @@ namespace IntegrationTests.Steps
     [Binding]
     class ServerSteps
     {
-        [Given(@"a creative superflat world on level '(.*)'")]
-        public void GivenACreativeSuperflatWorldOnLevel(int p0)
-        {
+        private readonly WorldContext _worldContext;
 
+        public ServerSteps(WorldContext worldContext)
+        {
+            _worldContext = worldContext;
+        }
+
+        [Given(@"a creative superflat world on level '(.*)'")]
+        public void GivenACreativeSuperflatWorldOnLevel(int yLevel)
+        {
+            _worldContext.YLevel = yLevel;
         }
 
     }
