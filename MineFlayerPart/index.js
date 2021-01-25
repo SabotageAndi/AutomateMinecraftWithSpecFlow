@@ -9,11 +9,16 @@ const port = 3000;
 
 const options = {
     host: 'localhost',
-    port: 58914,
+    port: 25565,
     username: 'SpecFlow'
   }
   
+
 const bot = mineflayer.createBot(options);
+bot.on('error', (err) =>
+{
+  console.log(err);
+});
 
 app.use(express.urlencoded()); 
 app.use(express.json());
@@ -185,3 +190,4 @@ function printError(err)
 {
   bot.chat(err);
 }
+
