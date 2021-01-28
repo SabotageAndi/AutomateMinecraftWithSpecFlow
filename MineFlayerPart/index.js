@@ -1,3 +1,5 @@
+const asyncHandler = require('express-async-handler')
+const { Vec3 } = require('vec3')
 const mineflayer = require('mineflayer')
 const Item = require("prismarine-item")("1.8");
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
@@ -12,7 +14,6 @@ const options = {
   port: 25565,
   username: 'SpecFlow'
 }
-
 
 const bot = mineflayer.createBot(options);
 bot.on('error', (err) => {
@@ -40,40 +41,38 @@ app.post('/position', (req, res) => {
   res.send(bot.entity.position);
 });
 
-app.post('/look', (req, res) => {
-  bot.lookAt(req.body);
-});
+app.post('/look', asyncHandler(async (req, res, next) => {
+  await bot.lookAt(req.body);
+}));
 
 app.get('/inventory', (req, res) => {
   res.send(sayItems());
 });
 
-app.post('/slot', (req, res) => {
+app.post('/slot', asyncHandler(async (req, res, next) => {
   var slotPosition = req.body.position;
   var itemName = req.body.item;
 
   item = findItemByName(itemName);
 
-  bot.creative.setInventorySlot(slotPosition, item);
+  await bot.creative.setInventorySlot(slotPosition, item);
 
   res.sendStatus(200);
-});
+}));
 
 
-app.post('/placeBlock', (req, res) => {
-  var itemName = req.body.item;
-  var position = req.body.position;
+app.post('/placeBlock', asyncHandler(async (req, res, next) => {
+    var itemName = req.body.item;
+    var position = new Vec3(req.body.position.x, req.body.position.y, req.body.position.z);
 
-  item = findItemByName(itemName);
+    await equipItem(itemName, 'hand');
 
-  bot.creative.setInventorySlot(10, item)
-    .then(() => {
-      bot.equip(item, 'hand').then(() => {
-        var referenceBlock = bot.blockAt(position);
-        bot.placeBlock(referenceBlock, new Vec3(0,1,0));
-      });
-    })
-});
+    const referenceBlock = bot.blockAt(position);
+    await bot.placeBlock(referenceBlock, new Vec3(0, 1, 0));
+
+    res.sendStatus(200);
+
+}));
 
 bot.loadPlugin(pathfinder)
 
@@ -83,11 +82,6 @@ bot.once('spawn', () => {
 
   // We create different movement generators for different type of activity
   defaultMove = new Movements(bot, mcData)
-
-  bot.on('path_update', (r) => {
-    const nodesPerTick = (r.visitedNodes * 50 / r.time).toFixed(2)
-    console.log(`I can get there in ${r.path.length} moves. Computation took ${r.time.toFixed(2)} ms (${r.visitedNodes} nodes, ${nodesPerTick} nodes/tick)`)
-  })
 })
 
 
@@ -113,30 +107,8 @@ function findItemByName(itemName) {
   return null;
 }
 
-function tossItem(name, amount) {
-  amount = parseInt(amount, 10)
-  const item = itemByName(name)
-  if (!item) {
-    bot.chat(`I have no ${name}`)
-  } else if (amount) {
-    bot.toss(item.type, null, amount, checkIfTossed)
-  } else {
-    bot.tossStack(item, checkIfTossed)
-  }
-
-  function checkIfTossed(err) {
-    if (err) {
-      bot.chat(`unable to toss: ${err.message}`)
-    } else if (amount) {
-      bot.chat(`tossed ${amount} x ${name}`)
-    } else {
-      bot.chat(`tossed ${name}`)
-    }
-  }
-}
-
 async function equipItem(name, destination) {
-  const item = itemByName(name)
+  const item = findItemInInventoryByName(name)
   if (item) {
     try {
       await bot.equip(item, destination)
@@ -200,7 +172,7 @@ function itemToString(item) {
   }
 }
 
-function itemByName(name) {
+function findItemInInventoryByName(name) {
   return bot.inventory.items().filter(item => item.name === name)[0]
 }
 
