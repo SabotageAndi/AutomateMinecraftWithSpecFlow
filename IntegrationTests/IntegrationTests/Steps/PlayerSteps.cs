@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Threading;
+using FluentAssertions;
 using IntegrationTests.Drivers;
+using Polly;
 using TechTalk.SpecFlow;
 
 namespace IntegrationTests.Steps
@@ -21,29 +23,22 @@ namespace IntegrationTests.Steps
         public void GivenThereIsTheAtXZ(string blockName, int x, int z)
         {
             var coordinateBlock = new Coordinate(x, _worldContext.YLevel, z);
-            var neighbourBlock = coordinateBlock with { Y = coordinateBlock.Y - 1 };
-
-            var placementVector = new Vector(0, 1, 0);
 
             var block = new Block(coordinateBlock, blockName, GetBlockType(blockName));
             _worldContext.Blocks[blockName] = block;
 
+            var neighbourBlock = coordinateBlock with { Y = coordinateBlock.Y - 1 };
+            var placementVector = new Vector(0, 1, 0);
 
             var coordinateForPlayer = coordinateBlock with { X = coordinateBlock.X - 1 };
-
-
-
 
             // go to coord one coord near block
             GoToCoordinates(coordinateForPlayer);
 
             // get block type into hand
             // place block
-            _mineFlayerDriver.PutBlockInInventory(block, 10);
+            _mineFlayerDriver.PutBlockInInventory(block.BlockType, 10);
             _mineFlayerDriver.PlaceBlock(block, neighbourBlock, placementVector);
-
-
-
         }
 
         [Given(@"there is the '(.*)' at X:(.*),Z:(.*) pointing to '(.*)'")]
@@ -61,7 +56,7 @@ namespace IntegrationTests.Steps
             var coordinateForPlayer = coordinateBlock with { X = coordinateBlock.X + 3 * placementVector.X, Z = coordinateBlock.Z + 3 * placementVector.Z };
             GoToCoordinates(coordinateForPlayer);
 
-            _mineFlayerDriver.PutBlockInInventory(block, 10);
+            _mineFlayerDriver.PutBlockInInventory(block.BlockType, 10);
             _mineFlayerDriver.PlaceBlock(block, targetBlock.Coordinate, placementVector);
         }
 
@@ -82,18 +77,27 @@ namespace IntegrationTests.Steps
 
             // get block type into hand
             // place block
-            _mineFlayerDriver.PutBlockInInventory(block, 10);
+            _mineFlayerDriver.PutBlockInInventory(block.BlockType, 10);
             _mineFlayerDriver.PlaceBlock(block, neighbourBlock, placementVector);
         }
 
         [When(@"a player puts an item into '(.*)'")]
-        public void WhenAPlayerPutsAnItemInto(string p0)
+        public void WhenAPlayerPutsAnItemInto(string blockName)
         {
+            var block = _worldContext.Blocks[blockName];
+
+            _mineFlayerDriver.PutBlockInInventory("Stone", 11);
+            _mineFlayerDriver.PutIntoChest(block.Coordinate, "Stone", 1);
         }
 
         [Then(@"it appears in '(.*)'")]
-        public void ThenItAppearsIn(string p0)
+        public void ThenItAppearsIn(string blockName)
         {
+            var block = _worldContext.Blocks[blockName];
+
+            var items =_mineFlayerDriver.GetChestContent(block.Coordinate);
+
+            items.Should().NotBeEmpty();
         }
 
 
@@ -104,22 +108,34 @@ namespace IntegrationTests.Steps
 
         private void GoToCoordinates(Coordinate coordinateForPlayer)
         {
-            _mineFlayerDriver.MovePlayerToCoordinates(coordinateForPlayer);
+            var policy = Policy.Handle<Exception>().Retry(3);
 
-            bool stillMoving = true;
-            do
+            policy.Execute(() =>
             {
-                var currentPlayerPosition = _mineFlayerDriver.GetPlayerCoordinate();
+                _mineFlayerDriver.MovePlayerToCoordinates(coordinateForPlayer);
 
-                if (Math.Abs(currentPlayerPosition.X - coordinateForPlayer.X) < 1 &&
-                    Math.Abs(currentPlayerPosition.Y - coordinateForPlayer.Y) < 1 &&
-                    Math.Abs(currentPlayerPosition.Z - coordinateForPlayer.Z) < 1)
+                bool stillMoving = true;
+                int count = 0;
+                do
                 {
-                    stillMoving = false;
-                }
+                    count++;
+                    var currentPlayerPosition = _mineFlayerDriver.GetPlayerCoordinate();
 
-                Thread.Sleep(500);
-            } while (stillMoving);
+                    if (Math.Abs(currentPlayerPosition.X - coordinateForPlayer.X) < 1 &&
+                        Math.Abs(currentPlayerPosition.Y - coordinateForPlayer.Y) < 1 &&
+                        Math.Abs(currentPlayerPosition.Z - coordinateForPlayer.Z) < 1)
+                    {
+                        stillMoving = false;
+                    }
+
+                    if (count > 10)
+                    {
+                        throw new Exception("Bot didn't moved to location");
+                    }
+
+                    Thread.Sleep(1000);
+                } while (stillMoving);
+            });
         }
     }
 

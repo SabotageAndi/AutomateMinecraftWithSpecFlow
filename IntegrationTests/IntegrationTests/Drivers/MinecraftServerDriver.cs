@@ -15,7 +15,7 @@ namespace IntegrationTests.Drivers
         private string _worldFolder;
         private string _worldBackupFolder;
         private Process _process;
-
+        private ManualResetEvent _serverStarted;
         public MinecraftServerDriver(TestRunContext testRunContext)
         {
             _testRunContext = testRunContext;
@@ -42,11 +42,29 @@ namespace IntegrationTests.Drivers
             processStartInfo.RedirectStandardInput = true;
             processStartInfo.RedirectStandardOutput = true;
             processStartInfo.RedirectStandardError = true;
+            
+
+            _serverStarted = new ManualResetEvent(false);
+
+            
 
             _process = new Process() { StartInfo = processStartInfo};
+            _process.OutputDataReceived += _process_OutputDataReceived;
+            _process.EnableRaisingEvents = true;
             _process.Start();
+            _process.BeginOutputReadLine();
 
-            Thread.Sleep(TimeSpan.FromSeconds(10));
+            _serverStarted.WaitOne();
+
+            //Thread.Sleep(TimeSpan.FromSeconds(15));
+        }
+
+        private void _process_OutputDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            if (e.Data?.Contains("Done") ?? false)
+            {
+                _serverStarted.Set();
+            }
         }
 
         public void Stop()

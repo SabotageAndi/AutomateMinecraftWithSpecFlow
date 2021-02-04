@@ -4,4 +4,6 @@
     public record Coordinate(float X, float Y, float Z);
 
     public record Vector(float X, float Y, float Z);
+
+    public record ItemInInventory(string Name, int Amount);
 }

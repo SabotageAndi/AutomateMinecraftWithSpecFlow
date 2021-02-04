@@ -63,20 +63,56 @@ app.post('/slot', asyncHandler(async (req, res, next) => {
 
 
 app.post('/placeBlock', asyncHandler(async (req, res, next) => {
-    var itemName = req.body.item;
-    var position = new Vec3(req.body.position.x, req.body.position.y, req.body.position.z);
-    var placementVector = new Vec3(req.body.placementVector.x, req.body.placementVector.y, req.body.placementVector.z);
+  var itemName = req.body.item;
+  var position = new Vec3(req.body.position.x, req.body.position.y, req.body.position.z);
+  var placementVector = new Vec3(req.body.placementVector.x, req.body.placementVector.y, req.body.placementVector.z);
 
-    await equipItem(itemName, 'hand');
+  await equipItem(itemName, 'hand');
 
-    const referenceBlock = bot.blockAt(position);
+  const referenceBlock = bot.blockAt(position);
 
-    bot.setControlState('sneak', true);
-    await bot.placeBlock(referenceBlock, placementVector);
+  bot.setControlState('sneak', true);
+  await bot.placeBlock(referenceBlock, placementVector);
 
-    bot.setControlState('sneak', false);
-    res.sendStatus(200);
+  bot.setControlState('sneak', false);
+  await sleep(100);
+  res.sendStatus(200);
 
+}));
+
+app.get('/chest', asyncHandler(async (req, res, next) => {
+  var chestPosition = new Vec3(req.query.x, req.query.y, req.query.z);
+
+  const chestBlock = bot.blockAt(chestPosition);
+
+  const chest = bot.openChest(chestBlock);
+  await sleep(2000);
+
+  try {
+    var items = chest.items();
+  } catch (error) {
+    res.send(error);
+  }
+  finally {
+    chest.close();
+  }
+
+  res.send(items);
+}));
+
+app.post('/chest', asyncHandler(async (req, res, next) => {
+  var chestPosition = new Vec3(req.body.position.x, req.body.position.y, req.body.position.z);
+
+  const chestBlock = bot.blockAt(chestPosition);
+
+  const chest = bot.openChest(chestBlock);
+  await sleep(500);
+
+
+  await depositItem(chest, req.body.item, req.body.amount);
+
+  chest.close();
+  res.sendStatus(200);
 }));
 
 bot.loadPlugin(pathfinder);
@@ -126,20 +162,6 @@ async function equipItem(name, destination) {
   }
 }
 
-async function unequipItem(destination) {
-  try {
-    await bot.unequip(destination)
-    bot.chat('unequipped')
-  } catch (err) {
-    bot.chat(`cannot unequip: ${err.message}`)
-  }
-}
-
-function useEquippedItem() {
-  bot.chat('activating item')
-  bot.activateItem()
-}
-
 function itemToString(item) {
   if (item) {
     return `${item.displayName} x ${item.count}`
@@ -156,3 +178,23 @@ function printError(err) {
   bot.chat(err);
 }
 
+
+async function depositItem(chest, name, amount) {
+  const item = findItemInInventoryByDisplayName(name)
+  if (item) {
+    try {
+      await chest.deposit(item.type, null, amount)
+      bot.chat(`deposited ${amount} ${item.name}`)
+    } catch (err) {
+      bot.chat(`unable to deposit ${amount} ${item.name} because of ${err}`)
+    }
+  } else {
+    bot.chat(`unknown item ${name}`)
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}   
