@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Threading;
 using IntegrationTests.Drivers;
 using TechTalk.SpecFlow;
 
@@ -21,46 +20,70 @@ namespace IntegrationTests.Steps
         [Given(@"there is the '(.*)' at X:(.*),Z:(.*)")]
         public void GivenThereIsTheAtXZ(string blockName, int x, int z)
         {
-            var coordinateBlock = new Coordinate(x,_worldContext.YLevel, z);
+            var coordinateBlock = new Coordinate(x, _worldContext.YLevel, z);
+            var neighbourBlock = coordinateBlock with { Y = coordinateBlock.Y - 1 };
 
-            _worldContext.Blocks[blockName] = new Block(coordinateBlock, blockName, GetBlockType(blockName));
+            var placementVector = new Vector(0, 1, 0);
 
-
-            var coordinateForPlayer = coordinateBlock with {X = coordinateBlock.X - 1};
-
-            var lookingVector = new Vector(coordinateForPlayer.X - coordinateBlock.X,
-                coordinateForPlayer.Y - coordinateBlock.Y,
-                coordinateForPlayer.Z - coordinateBlock.Z);
+            var block = new Block(coordinateBlock, blockName, GetBlockType(blockName));
+            _worldContext.Blocks[blockName] = block;
 
 
-            var currentPlayerPosition = _mineFlayerDriver.GetPlayerCoordinate();
+            var coordinateForPlayer = coordinateBlock with { X = coordinateBlock.X - 1 };
 
 
-            currentPlayerPosition = _mineFlayerDriver.MovePlayerToCoordinates(coordinateForPlayer);
 
 
-            _mineFlayerDriver.LookAt(coordinateBlock);
-
-            // get coords where block should be
             // go to coord one coord near block
-            // look at targetblock
+            GoToCoordinates(coordinateForPlayer);
+
             // get block type into hand
             // place block
+            _mineFlayerDriver.PutBlockInInventory(block, 10);
+            _mineFlayerDriver.PlaceBlock(block, neighbourBlock, placementVector);
+
+
 
         }
 
         [Given(@"there is the '(.*)' at X:(.*),Z:(.*) pointing to '(.*)'")]
         public void GivenThereIsTheAtXZPointingTo(string blockName, int x, int z, string targetBlockName)
         {
-            var coordinate = new Coordinate(x, _worldContext.YLevel, z);
-            _worldContext.Blocks[blockName] = new Block(coordinate, blockName, GetBlockType(blockName));
+            var coordinateBlock = new Coordinate(x, _worldContext.YLevel, z);
+            var block = new Block(coordinateBlock, blockName, GetBlockType(blockName));
+            _worldContext.Blocks[blockName] = block;
+
+            var targetBlock = _worldContext.Blocks[targetBlockName];
+
+            var placementVector = new Vector(coordinateBlock.X - targetBlock.Coordinate.X, coordinateBlock.Y - targetBlock.Coordinate.Y, coordinateBlock.Z - targetBlock.Coordinate.Z);
 
 
+            var coordinateForPlayer = coordinateBlock with { X = coordinateBlock.X + 3 * placementVector.X, Z = coordinateBlock.Z + 3 * placementVector.Z };
+            GoToCoordinates(coordinateForPlayer);
+
+            _mineFlayerDriver.PutBlockInInventory(block, 10);
+            _mineFlayerDriver.PlaceBlock(block, targetBlock.Coordinate, placementVector);
         }
 
         [Given(@"there is the '(.*)' at X:(.*),Y:(.*),Z:(.*)")]
-        public void GivenThereIsTheAtXYZ(string p0, int p1, int p2, int p3)
+        public void GivenThereIsTheAtXYZ(string blockName, int x, int y, int z)
         {
+            var coordinateBlock = new Coordinate(x, y, z);
+            var neighbourBlock = coordinateBlock with { Y = coordinateBlock.Y - 1 };
+
+            var placementVector = new Vector(0, 1, 0);
+
+            var block = new Block(coordinateBlock, blockName, GetBlockType(blockName));
+            _worldContext.Blocks[blockName] = block;
+
+
+            // go to coord one coord near block
+            GoToCoordinates(coordinateBlock with { X = coordinateBlock.X - 1 });
+
+            // get block type into hand
+            // place block
+            _mineFlayerDriver.PutBlockInInventory(block, 10);
+            _mineFlayerDriver.PlaceBlock(block, neighbourBlock, placementVector);
         }
 
         [When(@"a player puts an item into '(.*)'")]
@@ -78,8 +101,28 @@ namespace IntegrationTests.Steps
         {
             return blockname.Split('#')[0];
         }
+
+        private void GoToCoordinates(Coordinate coordinateForPlayer)
+        {
+            _mineFlayerDriver.MovePlayerToCoordinates(coordinateForPlayer);
+
+            bool stillMoving = true;
+            do
+            {
+                var currentPlayerPosition = _mineFlayerDriver.GetPlayerCoordinate();
+
+                if (Math.Abs(currentPlayerPosition.X - coordinateForPlayer.X) < 1 &&
+                    Math.Abs(currentPlayerPosition.Y - coordinateForPlayer.Y) < 1 &&
+                    Math.Abs(currentPlayerPosition.Z - coordinateForPlayer.Z) < 1)
+                {
+                    stillMoving = false;
+                }
+
+                Thread.Sleep(500);
+            } while (stillMoving);
+        }
     }
 
-    
+
 
 }

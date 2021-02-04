@@ -55,7 +55,8 @@ app.post('/slot', asyncHandler(async (req, res, next) => {
 
   item = findItemByName(itemName);
 
-  await bot.creative.setInventorySlot(slotPosition, item);
+  bot.creative.setInventorySlot(slotPosition, item);
+
 
   res.sendStatus(200);
 }));
@@ -64,17 +65,21 @@ app.post('/slot', asyncHandler(async (req, res, next) => {
 app.post('/placeBlock', asyncHandler(async (req, res, next) => {
     var itemName = req.body.item;
     var position = new Vec3(req.body.position.x, req.body.position.y, req.body.position.z);
+    var placementVector = new Vec3(req.body.placementVector.x, req.body.placementVector.y, req.body.placementVector.z);
 
     await equipItem(itemName, 'hand');
 
     const referenceBlock = bot.blockAt(position);
-    await bot.placeBlock(referenceBlock, new Vec3(0, 1, 0));
 
+    bot.setControlState('sneak', true);
+    await bot.placeBlock(referenceBlock, placementVector);
+
+    bot.setControlState('sneak', false);
     res.sendStatus(200);
 
 }));
 
-bot.loadPlugin(pathfinder)
+bot.loadPlugin(pathfinder);
 
 bot.once('spawn', () => {
   // Once we've spawn, it is safe to access mcData because we know the version
@@ -108,7 +113,7 @@ function findItemByName(itemName) {
 }
 
 async function equipItem(name, destination) {
-  const item = findItemInInventoryByName(name)
+  const item = findItemInInventoryByDisplayName(name)
   if (item) {
     try {
       await bot.equip(item, destination)
@@ -135,45 +140,16 @@ function useEquippedItem() {
   bot.activateItem()
 }
 
-async function craftItem(name, amount) {
-  amount = parseInt(amount, 10)
-  const mcData = require('minecraft-data')(bot.version)
-
-  const item = mcData.findItemOrBlockByName(name)
-  const craftingTableID = mcData.blocksByName.crafting_table.id
-
-  const craftingTable = bot.findBlock({
-    matching: craftingTableID
-  })
-
-  if (item) {
-    const recipe = bot.recipesFor(item.id, null, 1, craftingTable)[0]
-    if (recipe) {
-      bot.chat(`I can make ${name}`)
-      try {
-        await bot.craft(recipe, amount, craftingTable)
-        bot.chat(`did the recipe for ${name} ${amount} times`)
-      } catch (err) {
-        bot.chat(`error making ${name}`)
-      }
-    } else {
-      bot.chat(`I cannot make ${name}`)
-    }
-  } else {
-    bot.chat(`unknown item: ${name}`)
-  }
-}
-
 function itemToString(item) {
   if (item) {
-    return `${item.name} x ${item.count}`
+    return `${item.displayName} x ${item.count}`
   } else {
     return '(nothing)'
   }
 }
 
-function findItemInInventoryByName(name) {
-  return bot.inventory.items().filter(item => item.name === name)[0]
+function findItemInInventoryByDisplayName(name) {
+  return bot.inventory.items().filter(item => item.displayName === name)[0]
 }
 
 function printError(err) {

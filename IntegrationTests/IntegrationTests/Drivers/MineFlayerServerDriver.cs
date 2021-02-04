@@ -32,7 +32,7 @@ namespace IntegrationTests.Drivers
             _process = new Process() { StartInfo = processStartInfo };
             _process.Start();
 
-            Thread.Sleep(TimeSpan.FromSeconds(10));
+            Thread.Sleep(TimeSpan.FromSeconds(5));
         }
 
         public void Stop()
