@@ -17,6 +17,14 @@ namespace IntegrationTests.Drivers
             _restClient = new RestClient("http://localhost:3000");
         }
 
+        public bool GetStatus()
+        {
+            var request = new RestRequest("status", Method.GET);
+
+            var response = _restClient.Get(request);
+
+            return response.IsSuccessful;
+        }
         public Coordinate GetPlayerCoordinate()
         {
             var request = new RestRequest("position", Method.GET);

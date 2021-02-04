@@ -115,6 +115,18 @@ app.post('/chest', asyncHandler(async (req, res, next) => {
   res.sendStatus(200);
 }));
 
+app.get('/status', (req, res) => 
+{
+  if (mcData != undefined)
+  {
+    res.sendStatus(200);
+  }
+  else
+  {
+    res.sendStatus(503);
+  }
+});
+
 bot.loadPlugin(pathfinder);
 
 bot.once('spawn', () => {

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
+using Polly;
 using TechTalk.SpecRun;
 
 namespace IntegrationTests.Drivers
@@ -11,12 +12,14 @@ namespace IntegrationTests.Drivers
     public class MineFlayerServerDriver
     {
         private TestRunContext _testRunContext;
+        private readonly MineFlayerDriver _mineFlayerDriver;
         private string _serverPath;
         private Process _process;
 
-        public MineFlayerServerDriver(TestRunContext testRunContext)
+        public MineFlayerServerDriver(TestRunContext testRunContext, MineFlayerDriver mineFlayerDriver)
         {
             _testRunContext = testRunContext;
+            _mineFlayerDriver = mineFlayerDriver;
 
             _serverPath = Path.Combine(_testRunContext.TestDirectory, "..", "..", "..", "..", "..", "MineFlayerPart");
         }
@@ -32,7 +35,11 @@ namespace IntegrationTests.Drivers
             _process = new Process() { StartInfo = processStartInfo };
             _process.Start();
 
-            Thread.Sleep(TimeSpan.FromSeconds(5));
+            var policy = Polly.Policy.HandleResult<bool>(v => !v).RetryForever();
+
+            policy.Execute(() => _mineFlayerDriver.GetStatus());
+
+            
         }
 
         public void Stop()
